@@ -4,6 +4,10 @@
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg) ![React](https://img.shields.io/badge/React-18-blue) ![Tailwind](https://img.shields.io/badge/Tailwind-4.0-38bdf8)
 
+
+https://github.com/user-attachments/assets/fc80269a-9537-4fae-b64d-1be79d60c8ef
+
+
 ## 🚀 Features
 
 ### 1. Interactive Visualization
