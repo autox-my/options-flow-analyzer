@@ -12,13 +12,17 @@ import {
   ResponsiveContainer, 
   ReferenceLine
 } from 'recharts';
-import { Upload, FileText, Filter, TrendingUp, TrendingDown, Activity, Info, Sparkles, MessageSquare, Send, Loader2, ArrowRightLeft, Plus, Database, Layers, DollarSign, HelpCircle, Trash2, X, MoveDiagonal, Settings, Save, FolderOpen, Download } from 'lucide-react';
+import { Upload, FileText, Filter, TrendingUp, TrendingDown, Activity, Info, Sparkles, MessageSquare, Send, Loader2, ArrowRightLeft, Plus, Database, Layers, DollarSign, HelpCircle, Trash2, X, MoveDiagonal, Settings, Save, FolderOpen, Download, Cpu, ShieldAlert, Lightbulb } from 'lucide-react';
 
 // --- Helper Functions ---
 
 // Gemini API Helper
 const callGemini = async (prompt) => {
-  const apiKey = ""; // Runtime provided
+  // ---------------------------------------------------------
+  // 🔑 API KEY CONFIGURATION
+  // For LOCAL use: Paste your key inside the quotes below.
+  // ---------------------------------------------------------
+  const apiKey = ""; 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
   
   const payload = { 
@@ -61,6 +65,18 @@ const parsePremium = (str) => {
   clean = clean.replace(/[KM]/g, '');
   const result = parseFloat(clean) * multiplier;
   return isNaN(result) ? 0 : result;
+};
+
+const roundToNiceNumber = (num) => {
+  if (num === 0) return 10000;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(num)));
+  const normalized = num / magnitude;
+  let scalar;
+  if (normalized < 1.5) scalar = 2; 
+  else if (normalized < 2.5) scalar = 3;
+  else if (normalized < 5) scalar = 5;
+  else scalar = 10;
+  return scalar * magnitude;
 };
 
 const parseDateTime = (dateStr, timeStr) => {
@@ -119,6 +135,69 @@ const SAMPLE_DATA = `date,time,symbol,expiry,strike,put_call,side,spot,size,pric
 11/18/2025,04:13:12 PM,SPY,11/18/2025,665,put,bid,659.65,1000,$5.30,$3M,block,54201,9214,
 11/18/2025,04:11:22 PM,SPY,11/19/2025,655,put,ask,659.89,569,$1.57,$89.3K,sweep,15203,2145,
 11/18/2025,04:11:22 PM,SPY,11/19/2025,665,put,bid,659.89,501,$5.29,$146.3K,sweep,1240,560,unusual`;
+
+// --- Performance Monitor Component ---
+const PerfMonitor = ({ isVisible }) => {
+  const [metrics, setMetrics] = useState({ fps: 0, memory: 0, renderCount: 0, lastRenderTime: 0 });
+  const renderCountRef = useRef(0);
+  const lastRenderRef = useRef(performance.now());
+  const lastRenderDurationRef = useRef(0);
+  const frameCountRef = useRef(0);
+  const lastFrameTimeRef = useRef(performance.now());
+
+  useEffect(() => {
+    renderCountRef.current += 1;
+    const now = performance.now();
+    lastRenderDurationRef.current = now - lastRenderRef.current;
+    lastRenderRef.current = now;
+  });
+
+  useEffect(() => {
+    if (!isVisible) return;
+    let animationFrameId;
+    const loop = () => {
+      const now = performance.now();
+      frameCountRef.current++;
+      if (now - lastFrameTimeRef.current >= 1000) {
+        const memory = (window.performance && window.performance.memory) 
+           ? Math.round(window.performance.memory.usedJSHeapSize / 1024 / 1024) 
+           : 0;
+        setMetrics({
+          fps: frameCountRef.current,
+          memory: memory,
+          renderCount: renderCountRef.current,
+          lastRenderTime: lastRenderDurationRef.current
+        });
+        frameCountRef.current = 0;
+        lastFrameTimeRef.current = now;
+      }
+      animationFrameId = requestAnimationFrame(loop);
+    };
+    loop();
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [isVisible]);
+
+  if (!isVisible) return null;
+
+  return (
+    <div className="fixed bottom-4 right-4 bg-black/80 text-green-400 p-3 rounded-lg font-mono text-xs z-[9999] shadow-2xl border border-green-900 w-48 pointer-events-none">
+      <div className="flex justify-between border-b border-green-900 pb-1 mb-1">
+        <span className="font-bold text-white">PERF MONITOR</span>
+        <Cpu className="w-3 h-3 text-green-500 animate-pulse" />
+      </div>
+      <div className="grid grid-cols-2 gap-y-1">
+        <span>FPS:</span>
+        <span className={metrics.fps < 30 ? "text-red-400 font-bold" : "text-right"}>{metrics.fps}</span>
+        <span>Renders:</span>
+        <span className="text-right text-blue-300">{metrics.renderCount}</span>
+        <span>Last Frame:</span>
+        <span className={`text-right ${metrics.lastRenderTime > 30 ? "text-yellow-400" : ""}`}>{metrics.lastRenderTime.toFixed(1)}ms</span>
+        <span>RAM:</span>
+        <span className="text-right text-purple-300">{metrics.memory ? `${metrics.memory} MB` : 'N/A'}</span>
+      </div>
+    </div>
+  );
+};
 
 // --- Components ---
 
@@ -230,43 +309,14 @@ const CustomTooltip = ({ active, payload, label, metric }) => {
         <p className="font-bold text-gray-800 mb-2 border-b pb-1">Strike: ${label}</p>
         <div className="flex flex-col space-y-3">
           <div className="flex flex-col space-y-1">
-            <div className="flex justify-between items-center">
-                <span className="text-green-600 font-semibold">Calls:</span>
-                <span className="font-mono text-gray-700 text-xs">
-                    {totalCallSize.toLocaleString()} vol / ${ (totalCallPrem/1000).toFixed(1) }k
-                </span>
-            </div>
-            {(metric === 'premium' ? whaleCallPrem > 0 : data.callSizeWhale > 0) && (
-                <div className="flex justify-between items-center text-xs text-green-800 bg-green-50 px-1.5 py-1 rounded">
-                    <span className="flex items-center gap-1"><Sparkles className="w-3 h-3" /> Whales:</span>
-                    <span className="font-mono font-bold">
-                        {metric === 'premium' ? `$${(whaleCallPrem/1000).toFixed(1)}k` : `${data.callSizeWhale.toLocaleString()} vol`}
-                    </span>
-                </div>
-            )}
+            <div className="flex justify-between items-center"><span className="text-green-600 font-semibold">Calls:</span><span className="font-mono text-gray-700 text-xs">{totalCallSize.toLocaleString()} vol / ${ (totalCallPrem/1000).toFixed(1) }k</span></div>
+            {(metric === 'premium' ? whaleCallPrem > 0 : data.callSizeWhale > 0) && (<div className="flex justify-between items-center text-xs text-green-800 bg-green-50 px-1.5 py-1 rounded"><span className="flex items-center gap-1"><Sparkles className="w-3 h-3" /> Whales:</span><span className="font-mono font-bold">{metric === 'premium' ? `$${(whaleCallPrem/1000).toFixed(1)}k` : `${data.callSizeWhale.toLocaleString()} vol`}</span></div>)}
           </div>
           <div className="flex flex-col space-y-1">
-            <div className="flex justify-between items-center">
-                <span className="text-red-500 font-semibold">Puts:</span>
-                <span className="font-mono text-gray-700 text-xs">
-                    {totalPutSize.toLocaleString()} vol / ${ (totalPutPrem/1000).toFixed(1) }k
-                </span>
-            </div>
-            {(metric === 'premium' ? Math.abs(whalePutPrem) > 0 : Math.abs(data.putSizeWhale) > 0) && (
-                <div className="flex justify-between items-center text-xs text-red-800 bg-red-50 px-1.5 py-1 rounded">
-                    <span className="flex items-center gap-1"><Sparkles className="w-3 h-3" /> Whales:</span>
-                    <span className="font-mono font-bold">
-                        {metric === 'premium' ? `$${(Math.abs(whalePutPrem)/1000).toFixed(1)}k` : `${Math.abs(data.putSizeWhale).toLocaleString()} vol`}
-                    </span>
-                </div>
-            )}
+            <div className="flex justify-between items-center"><span className="text-red-500 font-semibold">Puts:</span><span className="font-mono text-gray-700 text-xs">{totalPutSize.toLocaleString()} vol / ${ (totalPutPrem/1000).toFixed(1) }k</span></div>
+            {(metric === 'premium' ? Math.abs(whalePutPrem) > 0 : Math.abs(data.putSizeWhale) > 0) && (<div className="flex justify-between items-center text-xs text-red-800 bg-red-50 px-1.5 py-1 rounded"><span className="flex items-center gap-1"><Sparkles className="w-3 h-3" /> Whales:</span><span className="font-mono font-bold">{metric === 'premium' ? `$${(Math.abs(whalePutPrem)/1000).toFixed(1)}k` : `${Math.abs(data.putSizeWhale).toLocaleString()} vol`}</span></div>)}
           </div>
-          <div className="pt-2 border-t border-gray-100 text-xs text-gray-400 flex justify-between">
-             <span>Net Sentiment:</span>
-             <span className={`font-bold ${totalCallPrem > totalPutPrem ? 'text-green-600' : 'text-red-500'}`}>
-                {totalCallPrem > totalPutPrem ? 'BULLISH' : 'BEARISH'}
-             </span>
-          </div>
+          <div className="pt-2 border-t border-gray-100 text-xs text-gray-400 flex justify-between"><span>Net Sentiment:</span><span className={`font-bold ${totalCallPrem > totalPutPrem ? 'text-green-600' : 'text-red-500'}`}>{totalCallPrem > totalPutPrem ? 'BULLISH' : 'BEARISH'}</span></div>
         </div>
       </div>
     );
@@ -274,15 +324,14 @@ const CustomTooltip = ({ active, payload, label, metric }) => {
   return null;
 };
 
+// --- Improved Markdown Formatter ---
 const FormattedMarkdown = ({ text }) => {
   if (!text) return null;
   
   const renderInline = (content) => {
     const parts = content.split(/(\*\*.*?\*\*)/g);
     return parts.map((part, i) => {
-      if (part.startsWith('**') && part.endsWith('**')) {
-        return <strong key={i} className="font-bold text-gray-900">{part.slice(2, -2)}</strong>;
-      }
+      if (part.startsWith('**') && part.endsWith('**')) return <strong key={i} className="font-bold text-gray-900">{part.slice(2, -2)}</strong>;
       return part;
     });
   };
@@ -292,21 +341,21 @@ const FormattedMarkdown = ({ text }) => {
   let currentTable = [];
 
   lines.forEach((line) => {
-    const trimmed = line.trim();
-    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
-      currentTable.push(trimmed);
-    } else {
-      if (currentTable.length > 0) {
-        blocks.push({ type: 'table', rows: currentTable });
-        currentTable = [];
-      }
-      blocks.push({ type: 'text', content: line });
+    // Fix for bullet + header (e.g. •### Title)
+    // We check if line is a "fake header" and clean it up
+    let cleanLine = line.trim();
+    if (/^[\u2022\-\*]\s*#{2,}/.test(cleanLine)) {
+        // Remove the bullet so it parses as a header below
+        cleanLine = cleanLine.replace(/^[\u2022\-\*]\s*/, ''); 
+    }
+
+    if (cleanLine.startsWith('|') && cleanLine.endsWith('|')) { currentTable.push(cleanLine); } 
+    else { 
+        if (currentTable.length > 0) { blocks.push({ type: 'table', rows: currentTable }); currentTable = []; } 
+        blocks.push({ type: 'text', content: cleanLine }); 
     }
   });
-  
-  if (currentTable.length > 0) {
-    blocks.push({ type: 'table', rows: currentTable });
-  }
+  if (currentTable.length > 0) blocks.push({ type: 'table', rows: currentTable });
 
   return (
     <div className="space-y-1.5 text-xs text-gray-700 leading-relaxed font-sans">
@@ -320,37 +369,28 @@ const FormattedMarkdown = ({ text }) => {
           return (
             <div key={index} className="overflow-x-auto my-3 border rounded-md border-gray-200">
               <table className="min-w-full divide-y divide-gray-200 text-xs">
-                <thead className="bg-gray-50">
-                  <tr>
-                    {headers.map((h, i) => (
-                      <th key={i} className="px-3 py-2 text-left font-semibold text-gray-600 uppercase tracking-wider">{renderInline(h)}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-100">
-                  {dataRows.map((r, rIndex) => {
-                     const cells = parseCells(r);
-                     return (
-                       <tr key={rIndex} className={rIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
-                         {cells.map((c, cIndex) => (
-                           <td key={cIndex} className="px-3 py-1.5 text-gray-700 whitespace-nowrap">{renderInline(c)}</td>
-                         ))}
-                       </tr>
-                     );
-                  })}
-                </tbody>
+                <thead className="bg-gray-50"><tr>{headers.map((h, i) => <th key={i} className="px-3 py-2 text-left font-semibold text-gray-600 uppercase tracking-wider">{renderInline(h)}</th>)}</tr></thead>
+                <tbody className="bg-white divide-y divide-gray-100">{dataRows.map((r, rIndex) => { const cells = parseCells(r); return <tr key={rIndex} className={rIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>{cells.map((c, cIndex) => <td key={cIndex} className="px-3 py-1.5 text-gray-700 whitespace-nowrap">{renderInline(c)}</td>)}</tr>; })}</tbody>
               </table>
             </div>
           );
         } else {
-          const trimmed = block.content.trim();
+          const trimmed = block.content;
           if (!trimmed) return <div key={index} className="h-2" />;
-          if (trimmed.startsWith('###') || trimmed.startsWith('##')) return <h4 key={index} className="font-bold text-indigo-900 mt-2 mb-1 text-sm">{renderInline(trimmed.replace(/^#+\s*/, ''))}</h4>;
-          const isBullet = trimmed.startsWith('* ') || trimmed.startsWith('- ');
+          
+          // Header parsing
+          if (trimmed.startsWith('###') || trimmed.startsWith('##')) {
+             return <h4 key={index} className="font-bold text-indigo-900 mt-3 mb-1 text-sm">{renderInline(trimmed.replace(/^#+\s*/, ''))}</h4>;
+          }
+          
+          // List Item parsing
+          const isBullet = trimmed.startsWith('* ') || trimmed.startsWith('- ') || trimmed.startsWith('• ');
           const isNumber = /^\d+\.\s/.test(trimmed);
+          
           let content = trimmed;
-          if (isBullet) content = trimmed.substring(2);
+          if (isBullet) content = trimmed.replace(/^[\*\-\u2022]\s*/, '');
           if (isNumber) content = trimmed.replace(/^\d+\.\s/, '');
+          
           return (
             <div key={index} className={`flex ${isBullet || isNumber ? 'ml-2' : ''}`}>
               {isBullet && <span className="mr-1.5 text-indigo-400">•</span>}
@@ -364,118 +404,84 @@ const FormattedMarkdown = ({ text }) => {
   );
 };
 
-// --- MEMOIZED CHART COMPONENTS ---
+const SAMPLE_DATA_OBJ = parseCSV(SAMPLE_DATA);
 
-const MemoizedTornadoChart = React.memo(({ 
-  data, 
-  dataKeys, 
-  symmetricDomain, 
-  symmetricTicks, 
-  yAxisWidth, 
-  sharedMargin, 
-  axisTickStyle, 
-  fixedBarSize, 
-  metric 
-}) => {
+// --- ISOLATED CHAT INTERFACE (Fixes Typing Lag) ---
+const ChatInterface = ({ suggestedQuestions, onSend, chatResponse, isChatLoading }) => {
+  const [inputValue, setInputValue] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!inputValue.trim()) return;
+    onSend(inputValue);
+    setInputValue(''); // Clear input after sending
+  };
+
   return (
-    <div className="flex-1 flex flex-col min-h-0 border border-gray-100 rounded-lg overflow-hidden">
-      <div className="h-[40px] w-full bg-gray-50/50 border-b border-gray-100 flex-shrink-0 flex">
-          <div className="flex-1 pr-[14px]">
-              <ResponsiveContainer width="100%" height="100%">
-                  <BarChart layout="vertical" data={data} margin={sharedMargin} stackOffset="sign">
-                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
-                      <XAxis 
-                          type="number" 
-                          orientation="top" 
-                          tickFormatter={dataKeys.formatter} 
-                          stroke="#9ca3af" 
-                          fontSize={10} 
-                          tickLine={false} 
-                          domain={symmetricDomain} 
-                          allowDataOverflow={true} 
-                          ticks={symmetricTicks} 
-                      />
-                      <YAxis type="category" dataKey="strike" width={yAxisWidth} tick={false} axisLine={false} /> 
-                      <Bar dataKey={dataKeys.putNormal} fill="none" stroke="none" /> 
-                  </BarChart>
-              </ResponsiveContainer>
+    <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 flex flex-col h-[450px]">
+      <h3 className="text-sm font-medium text-gray-500 mb-3 flex items-center gap-2 flex-shrink-0"><MessageSquare className="w-4 h-4" /> Ask the Data</h3>
+      
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-y-auto min-h-0 pr-1 mb-3 flex flex-col">
+          {chatResponse && (
+              <div className="p-3 mb-4 bg-gray-50 rounded-md border-l-2 border-indigo-400 text-xs animate-in fade-in duration-300">
+                  <FormattedMarkdown text={chatResponse} />
+              </div>
+          )}
+          
+           {isChatLoading && (
+               <div className="p-3 mb-4 flex items-center gap-2 text-gray-400 text-xs">
+                  <Loader2 className="w-3 h-3 animate-spin" /> Thinking...
+               </div>
+          )}
+
+          <div className="mt-auto pt-2">
+              <p className="text-[10px] text-gray-400 mb-2 uppercase font-bold tracking-wide">Suggested Queries:</p>
+              <div className="flex flex-wrap gap-2">
+                  {suggestedQuestions.map((q, i) => (
+                  <button key={i} onClick={() => onSend(q)} className="text-[10px] px-2 py-1 bg-gray-50 border border-gray-200 rounded-full text-gray-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors text-left truncate max-w-full">
+                      {q}
+                  </button>
+                  ))}
+              </div>
           </div>
       </div>
-      <div className="flex-1 overflow-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-50">
-          <div style={{ height: Math.max(500, data.length * 25), width: '100%' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                  <BarChart layout="vertical" data={data} margin={sharedMargin} stackOffset="sign" barSize={fixedBarSize}>
-                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
-                      <XAxis type="number" hide domain={symmetricDomain} allowDataOverflow={true} ticks={symmetricTicks} />
-                      <YAxis dataKey="strike" type="category" width={yAxisWidth} tick={axisTickStyle} interval={0} />
-                      <Tooltip content={<CustomTooltip metric={metric} />} cursor={{fill: 'rgba(0,0,0,0.05)'}} />
-                      <ReferenceLine x={0} stroke="#000" strokeOpacity={0.2} />
-                      <Bar name="Puts (Normal)" dataKey={dataKeys.putNormal} stackId="a" fill="#f87171" radius={[0, 0, 0, 0]} stroke="none" />
-                      <Bar name="Puts (Whale)" dataKey={dataKeys.putWhale} stackId="a" fill="#b91c1c" radius={[0, 0, 0, 0]} stroke="none" />
-                      <Bar name="Calls (Normal)" dataKey={dataKeys.callNormal} stackId="a" fill="#4ade80" radius={[0, 0, 0, 0]} stroke="none" />
-                      <Bar name="Calls (Whale)" dataKey={dataKeys.callWhale} stackId="a" fill="#15803d" radius={[0, 0, 0, 0]} stroke="none" />
-                  </BarChart>
-              </ResponsiveContainer>
-          </div>
-      </div>
-    </div>
-  );
-});
 
-const MemoizedMomentumChart = React.memo(({ 
-  data, 
-  metric, 
-  showMA, 
-  SignalDot 
-}) => {
-  return (
-    <div className="h-[200px] w-full">
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-            <XAxis dataKey="timeStr" stroke="#9ca3af" fontSize={10} tickLine={false} minTickGap={30} />
-            <YAxis yAxisId="left" stroke="#9ca3af" fontSize={10} tickLine={false} tickFormatter={(val) => metric==='premium' ? `$${(val/1000).toFixed(0)}k` : val} />
-            <YAxis yAxisId="right" orientation="right" domain={['auto', 'auto']} stroke="#8884d8" fontSize={10} tickLine={false} tickFormatter={(val) => `$${val.toFixed(2)}`} />
-            <Tooltip content={<CustomTooltip metric={metric} />} />
-            <ReferenceLine y={0} yAxisId="left" stroke="#000" strokeOpacity={0.1} />
-            <Line 
-                yAxisId="left"
-                type="monotone" 
-                dataKey="netCumulative" 
-                stroke="#3b82f6" 
-                strokeWidth={2} 
-                // Fixed: Return null if showMA is false, not boolean
-                dot={({key, payload, cx, cy}) => showMA ? <SignalDot key={key} payload={payload} cx={cx} cy={cy} /> : null} 
-            />
-            {showMA && (
-                <Line yAxisId="left" type="monotone" dataKey="ma" stroke="#f97316" strokeWidth={1.5} strokeDasharray="4 4" dot={false} activeDot={false} />
-            )}
-            <Line yAxisId="right" type="monotone" dataKey="spot" stroke="#8884d8" strokeWidth={1.5} dot={false} activeDot={{ r: 4 }} />
-        </LineChart>
-      </ResponsiveContainer>
+      <form onSubmit={handleSubmit} className="relative flex-shrink-0 border-t border-gray-100 pt-3">
+        <input 
+          type="text" 
+          value={inputValue} 
+          onChange={(e) => setInputValue(e.target.value)} 
+          placeholder="Type a question..." 
+          className="w-full pl-3 pr-10 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" 
+        />
+        <button type="submit" disabled={isChatLoading || !inputValue} className="absolute right-1 top-4 p-1.5 text-gray-400 hover:text-indigo-600 disabled:opacity-50">
+            {isChatLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+        </button>
+      </form>
     </div>
   );
-});
+};
+
 
 const App = () => {
   const [datasets, setDatasets] = useState([]);
   const [selectedDatasetId, setSelectedDatasetId] = useState('all');
   const [selectedExpiry, setSelectedExpiry] = useState('All');
-  const [chartLayout, setChartLayout] = useState('vertical'); 
+  const chartLayout = 'vertical'; 
   const [metric, setMetric] = useState('premium'); 
   const [minValueFilter, setMinValueFilter] = useState(0); 
   const [showDatasetManager, setShowDatasetManager] = useState(false);
-  
-  // Momentum MA Settings
+  const [showPerfMonitor, setShowPerfMonitor] = useState(false);
   const [maLength, setMaLength] = useState(30);
   const [showMA, setShowMA] = useState(false);
-
-  const [aiSummary, setAiSummary] = useState('');
-  const [isAiLoading, setIsAiLoading] = useState(false);
-  const [chatQuery, setChatQuery] = useState('');
-  const [chatResponse, setChatResponse] = useState('');
+  const [isPulseLoading, setIsPulseLoading] = useState(false);
+  const [isStrategyLoading, setIsStrategyLoading] = useState(false);
   const [isChatLoading, setIsChatLoading] = useState(false);
   
+  const [aiSummary, setAiSummary] = useState('');
+  const [strategies, setStrategies] = useState('');
+  const [chatResponse, setChatResponse] = useState(''); // Only response state needed in App
   const scrollContainerRef = useRef(null);
 
   // --- Constants ---
@@ -499,19 +505,8 @@ const App = () => {
       }
   }, [metric]);
 
-  const handleMetricChange = (newMetric) => {
-      setMetric(newMetric);
-      setMinValueFilter(0); 
-  };
-
-  const handleRemoveDataset = (e, idToRemove) => {
-      e.stopPropagation(); 
-      setDatasets(prev => {
-          const updated = prev.filter(ds => ds.id !== idToRemove);
-          if (selectedDatasetId === idToRemove) setSelectedDatasetId('all');
-          return updated;
-      });
-  };
+  const handleMetricChange = (newMetric) => { setMetric(newMetric); setMinValueFilter(0); };
+  const handleRemoveDataset = (e, idToRemove) => { e.stopPropagation(); setDatasets(prev => { const updated = prev.filter(ds => ds.id !== idToRemove); if (selectedDatasetId === idToRemove) setSelectedDatasetId('all'); return updated; }); };
 
   const handleSaveProject = () => {
     if (datasets.length === 0) return;
@@ -551,12 +546,8 @@ const App = () => {
              });
             setDatasets(hydratedDatasets);
             setSelectedDatasetId('all'); 
-        } else {
-            alert("Invalid project file format.");
-        }
-      } catch (err) {
-        console.error("Failed to parse project file", err);
-      }
+        } else { alert("Invalid project file format."); }
+      } catch (err) { console.error("Failed to parse project file", err); }
     };
     reader.readAsText(file);
     event.target.value = ''; 
@@ -566,12 +557,9 @@ const App = () => {
   const handleSmartImport = (event) => {
     const file = event.target.files[0];
     if (!file) return;
-
     const reader = new FileReader();
-    
     reader.onload = (e) => {
       const content = e.target.result;
-      
       if (file.name.toLowerCase().endsWith('.json')) {
         try {
           const loaded = JSON.parse(content);
@@ -589,13 +577,8 @@ const App = () => {
              });
             setDatasets(hydratedDatasets);
             setSelectedDatasetId('all');
-          } else {
-            alert("Invalid project file format. Expected an array.");
-          }
-        } catch (err) {
-          console.error("Failed to parse JSON", err);
-          alert("Error parsing project file.");
-        }
+          } else { alert("Invalid project file format. Expected an array."); }
+        } catch (err) { console.error("Failed to parse JSON", err); alert("Error parsing project file."); }
       } else {
         try {
           const parsed = parseCSV(content);
@@ -603,11 +586,8 @@ const App = () => {
           let displayName = file.name;
           if (parsed.length > 0) {
               const firstRow = parsed[0];
-              if (firstRow.date && firstRow.time && firstRow.symbol) {
-                  displayName = `${firstRow.symbol} - ${firstRow.date} ${firstRow.time}`;
-              } else if (firstRow.date) {
-                  displayName = `${firstRow.symbol || 'Data'} - ${firstRow.date}`;
-              }
+              if (firstRow.date && firstRow.time && firstRow.symbol) { displayName = `${firstRow.symbol} - ${firstRow.date} ${firstRow.time}`; } 
+              else if (firstRow.date) { displayName = `${firstRow.symbol || 'Data'} - ${firstRow.date}`; }
           }
           const newDataset = {
               id: Date.now().toString(),
@@ -617,26 +597,15 @@ const App = () => {
               uploadTime: new Date().toLocaleTimeString()
           };
           setDatasets(prev => [...prev, newDataset]);
-        } catch (err) {
-           console.error("Failed to parse CSV", err);
-           alert("Error parsing CSV file.");
-        }
+        } catch (err) { console.error("Failed to parse CSV", err); alert("Error parsing CSV file."); }
       }
     };
-
     reader.readAsText(file);
     event.target.value = ''; 
   };
 
   const loadSample = () => {
-    const parsed = parseCSV(SAMPLE_DATA);
-    const newDataset = {
-        id: 'sample-1',
-        name: 'Sample Data (SPY)',
-        fileName: 'Sample_Data.csv',
-        data: parsed,
-        uploadTime: new Date().toLocaleTimeString()
-    };
+    const newDataset = { id: 'sample-1', name: 'Sample Data (SPY)', fileName: 'Sample_Data.csv', data: SAMPLE_DATA_OBJ, uploadTime: new Date().toLocaleTimeString() };
     setDatasets([newDataset]);
   };
 
@@ -664,14 +633,7 @@ const App = () => {
   }, [activeData]);
 
   const processedData = useMemo(() => {
-    const defaultStructure = {
-        chartData: [],
-        momentumData: [],
-        totalCallPremium: 0, totalPutPremium: 0,
-        totalCallSize: 0, totalPutSize: 0,
-        avgSpot: 0,
-        latestSpot: 0
-    };
+    const defaultStructure = { chartData: [], momentumData: [], totalCallPremium: 0, totalPutPremium: 0, totalCallSize: 0, totalPutSize: 0, avgSpot: 0, latestSpot: 0 };
     if (!activeData.length) return defaultStructure;
 
     const filtered = activeData.filter(row => {
@@ -686,7 +648,6 @@ const App = () => {
     let spotPrice = 0, spotCount = 0;
     const WHALE_PREMIUM_THRESHOLD = 1000000; 
     const WHALE_SIZE_THRESHOLD = 1000;
-
     const timeSeries = [];
 
     filtered.forEach(row => {
@@ -694,19 +655,9 @@ const App = () => {
       const premium = parsePremium(row.premium);
       const size = parseFloat(row.size || 0);
       const type = row.put_call?.toLowerCase();
-      
       if (!strike || !type) return;
       if (row.spot) { spotPrice += parseFloat(row.spot); spotCount++; }
-
-      if (!strikeMap[strike]) {
-        strikeMap[strike] = { 
-            strike, 
-            callPremiumNormal: 0, callPremiumWhale: 0,
-            putPremiumNormal: 0, putPremiumWhale: 0,
-            callSizeNormal: 0, callSizeWhale: 0,
-            putSizeNormal: 0, putSizeWhale: 0
-        };
-      }
+      if (!strikeMap[strike]) { strikeMap[strike] = { strike, callPremiumNormal: 0, callPremiumWhale: 0, putPremiumNormal: 0, putPremiumWhale: 0, callSizeNormal: 0, callSizeWhale: 0, putSizeNormal: 0, putSizeWhale: 0 }; }
       const isWhale = metric === 'premium' ? premium >= WHALE_PREMIUM_THRESHOLD : size >= WHALE_SIZE_THRESHOLD;
       if (type === 'call') {
         if (isWhale) { strikeMap[strike].callPremiumWhale += premium; strikeMap[strike].callSizeWhale += size; } 
@@ -717,39 +668,30 @@ const App = () => {
         else { strikeMap[strike].putPremiumNormal -= premium; strikeMap[strike].putSizeNormal -= size; }
         totalPutPremium += premium; totalPutSize += size;
       }
-
-      timeSeries.push({
-          timestamp: row.timestamp || 0,
-          timeStr: row.time,
-          fullDate: `${row.date} ${row.time}`,
-          value: metric === 'premium' ? premium : size,
-          type: type, 
-          spot: parseFloat(row.spot) || 0
-      });
+      timeSeries.push({ timestamp: row.timestamp || 0, timeStr: row.time, fullDate: `${row.date} ${row.time}`, value: metric === 'premium' ? premium : size, type: type, spot: parseFloat(row.spot) || 0 });
     });
 
     let chartData = Object.values(strikeMap);
     chartData.sort((a, b) => b.strike - a.strike); 
-    
+    // DYNAMIC LOD BUCKETING (The Optimization)
     timeSeries.sort((a, b) => a.timestamp - b.timestamp);
     const latestSpot = timeSeries.length > 0 ? timeSeries[timeSeries.length - 1].spot : 0;
-
+    
+    // Determine Bucket Size based on total duration
+    // < 1 day = 1 min, < 7 days = 15 mins, > 7 days = 1 hour
+    let bucketDuration = 60000; // 1 minute default
+    if (timeSeries.length > 0) {
+        const duration = timeSeries[timeSeries.length-1].timestamp - timeSeries[0].timestamp;
+        if (duration > 7 * 24 * 3600 * 1000) bucketDuration = 60 * 60000; // 1 hour
+        else if (duration > 24 * 3600 * 1000) bucketDuration = 15 * 60000; // 15 min
+    }
     const bucketedSeries = [];
     let currentBucket = null;
     timeSeries.forEach(item => {
-        const bucketTime = Math.floor(item.timestamp / 60000) * 60000;
+        const bucketTime = Math.floor(item.timestamp / bucketDuration) * bucketDuration;
         if (!currentBucket || currentBucket.bucketTime !== bucketTime) {
             if (currentBucket) bucketedSeries.push(currentBucket);
-            currentBucket = {
-                bucketTime,
-                timestamp: bucketTime,
-                timeStr: item.timeStr,
-                fullDate: item.fullDate,
-                netValue: 0,
-                spotSum: 0,
-                count: 0,
-                bucketSizeLabel: '1m'
-            };
+            currentBucket = { bucketTime, timestamp: bucketTime, timeStr: item.timeStr, fullDate: item.fullDate, netValue: 0, spotSum: 0, count: 0, bucketSizeLabel: bucketDuration === 60000 ? '1m' : (bucketDuration === 900000 ? '15m' : '1h') };
         }
         const change = item.type === 'call' ? item.value : -item.value;
         currentBucket.netValue += change;
@@ -761,20 +703,11 @@ const App = () => {
     let runningNet = 0;
     const momentumDataRaw = bucketedSeries.map(b => {
         runningNet += b.netValue;
-        return {
-            timeStr: b.timeStr,
-            fullDate: b.fullDate,
-            timestamp: b.timestamp,
-            netCumulative: runningNet,
-            spot: b.spotSum / b.count,
-            bucketSizeLabel: b.bucketSizeLabel
-        };
+        return { timeStr: b.timeStr, fullDate: b.fullDate, timestamp: b.timestamp, netCumulative: runningNet, spot: b.spotSum / b.count, bucketSizeLabel: b.bucketSizeLabel };
     });
 
     const momentumData = momentumDataRaw.map((item, index, arr) => {
-        if (index < maLength - 1) {
-            return { ...item, ma: null, signal: null };
-        }
+        if (index < maLength - 1) { return { ...item, ma: null, signal: null }; }
         const slice = arr.slice(index - maLength + 1, index + 1);
         const sum = slice.reduce((acc, curr) => acc + curr.netCumulative, 0);
         const ma = sum / maLength;
@@ -792,14 +725,7 @@ const App = () => {
         return { ...item, ma, signal };
     });
 
-    return {
-      chartData,
-      momentumData,
-      totalCallPremium, totalPutPremium,
-      totalCallSize, totalPutSize,
-      avgSpot: spotCount > 0 ? spotPrice / spotCount : 0,
-      latestSpot
-    };
+    return { chartData, momentumData, totalCallPremium, totalPutPremium, totalCallSize, totalPutSize, avgSpot: spotCount > 0 ? spotPrice / spotCount : 0, latestSpot };
   }, [activeData, selectedExpiry, minValueFilter, metric, maLength]);
 
   const { chartData, momentumData, totalCallPremium, totalPutPremium, totalCallSize, totalPutSize, avgSpot, latestSpot } = processedData;
@@ -823,19 +749,8 @@ const App = () => {
   }, [processedData, metric]);
 
   const dataKeys = useMemo(() => {
-    if (metric === 'premium') {
-        return {
-            callNormal: 'callPremiumNormal', callWhale: 'callPremiumWhale',
-            putNormal: 'putPremiumNormal', putWhale: 'putPremiumWhale',
-            formatter: (val) => `$${Math.abs(val / 1000).toFixed(0)}k`
-        };
-    } else {
-        return {
-            callNormal: 'callSizeNormal', callWhale: 'callSizeWhale',
-            putNormal: 'putSizeNormal', putWhale: 'putSizeWhale',
-            formatter: (val) => `${Math.abs(val).toLocaleString()}`
-        };
-    }
+    if (metric === 'premium') { return { callNormal: 'callPremiumNormal', callWhale: 'callPremiumWhale', putNormal: 'putPremiumNormal', putWhale: 'putPremiumWhale', formatter: (val) => `$${Math.abs(val / 1000).toFixed(0)}k` }; } 
+    else { return { callNormal: 'callSizeNormal', callWhale: 'callSizeWhale', putNormal: 'putSizeNormal', putWhale: 'putSizeWhale', formatter: (val) => `${Math.abs(val).toLocaleString()}` }; }
   }, [metric]);
 
   const displayTotalCalls = metric === 'premium' ? totalCallPremium : totalCallSize;
@@ -845,10 +760,7 @@ const App = () => {
   const callPercentage = totalVolume > 0 ? (displayTotalCalls / totalVolume) * 100 : 0;
   const putPercentage = totalVolume > 0 ? (displayTotalPuts / totalVolume) * 100 : 0;
   const metricLabel = metric === 'premium' ? 'Premium' : 'Volume';
-  const formatMetricValue = (val) => {
-      if (metric === 'premium') return `$${(val / 1000000).toFixed(2)}M`;
-      return val.toLocaleString(); 
-  };
+  const formatMetricValue = (val) => { if (metric === 'premium') return `$${(val / 1000000).toFixed(2)}M`; return val.toLocaleString(); };
   const sentiment = parseFloat(displayPCR) > 1 ? "Bearish" : "Bullish";
   const sentimentColor = sentiment === "Bearish" ? "text-red-500" : "text-green-600";
   
@@ -874,7 +786,6 @@ const App = () => {
   const axisTickStyle = { fill: '#9ca3af', fontSize: 10 };
   const sharedMargin = { top: 0, right: 45, left: 45, bottom: 0 };
   const yAxisWidth = 90;
-
   // Nice Number Logic
   const maxAbsVal = chartData.length > 0 ? Math.max(
     ...chartData.map(d => Math.max(
@@ -882,85 +793,14 @@ const App = () => {
        Math.abs(metric === 'premium' ? d.putPremiumNormal + d.putPremiumWhale : d.putSizeNormal + d.putSizeWhale)
     )), metric === 'premium' ? 10000 : 100
   ) : 10000;
-  const roundToNiceNumber = (num) => {
-    if (num === 0) return 10000;
-    const magnitude = Math.pow(10, Math.floor(Math.log10(num)));
-    const normalized = num / magnitude;
-    let scalar;
-    if (normalized < 1.5) scalar = 2; 
-    else if (normalized < 2.5) scalar = 3;
-    else if (normalized < 5) scalar = 5;
-    else scalar = 10;
-    return scalar * magnitude;
-  };
   const niceMax = roundToNiceNumber(maxAbsVal);
   const symmetricDomain = [-niceMax, niceMax];
   const symmetricTicks = [-niceMax, -niceMax/2, 0, niceMax/2, niceMax];
 
-  const generateContext = () => {
-    if (!processedData || !activeData.length) return "";
-    const contextPcr = metric === 'premium' 
-        ? (totalCallPremium > 0 ? (totalPutPremium / totalCallPremium).toFixed(2) : "N/A")
-        : (totalCallSize > 0 ? (totalPutSize / totalCallSize).toFixed(2) : "N/A");
-    const topStrikes = [...chartData].slice(0, 5).map(s => `Strike $${s.strike}`).join('; ');
-    const bigTrades = activeData.sort((a, b) => parsePremium(b.premium) - parsePremium(a.premium)).slice(0, 3).map(t => `${t.side} ${t.put_call} at $${t.strike}`).join('; ');
-
-    let netFlowTrend = "Flat";
-    let spotTrend = "Flat";
-    let divergence = "None";
-
-    if (momentumData.length > 1) {
-        const startFlow = momentumData[0].netCumulative;
-        const endFlow = momentumData[momentumData.length - 1].netCumulative;
-        const startSpot = momentumData[0].spot;
-        const endSpot = momentumData[momentumData.length - 1].spot;
-        if (endFlow > startFlow) netFlowTrend = "Accumulating (Bullish)";
-        else if (endFlow < startFlow) netFlowTrend = "Distributing (Bearish)";
-        if (endSpot > startSpot) spotTrend = "Increasing";
-        else if (endSpot < startSpot) spotTrend = "Decreasing";
-        if (spotTrend === "Decreasing" && netFlowTrend.includes("Bullish")) divergence = "Bullish Divergence (Price Down, Flow Up)";
-        if (spotTrend === "Increasing" && netFlowTrend.includes("Bearish")) divergence = "Bearish Divergence (Price Up, Flow Down)";
-    }
-
-    return `
-      Mode: ${metric.toUpperCase()} (Filter: ${minValueFilter})
-      Ticker: ${activeData[0]?.symbol} | Spot: $${latestSpot.toFixed(2)}
-      Calls: ${metric==='premium' ? '$'+(totalCallPremium/1e6).toFixed(2)+'M' : totalCallSize}
-      Puts: ${metric==='premium' ? '$'+(totalPutPremium/1e6).toFixed(2)+'M' : totalPutSize}
-      PCR: ${contextPcr}
-      Top Strikes: ${topStrikes}
-      Big Trades: ${bigTrades}
-      --- TREND ANALYSIS ---
-      Net Flow Trend: ${netFlowTrend}
-      Spot Price Trend: ${spotTrend}
-      Divergence Detected: ${divergence}
-    `;
-  };
-
-  const handleGenerateSummary = async () => {
-      setIsAiLoading(true); setAiSummary('');
-      const context = generateContext();
-      const prompt = `Expert summary for ${activeData[0]?.symbol} option flow. Mode: ${metric}. Filter: >${minValueFilter}. Context: ${context}. Provide 3 concise sentences on sentiment, levels, and whales. Use Markdown bold/lists/tables if needed.`;
-      const res = await callGemini(prompt);
-      setAiSummary(res); setIsAiLoading(false);
-  };
-
-  const handleChat = async (e) => {
-    e.preventDefault(); if (!chatQuery.trim()) return;
-    setIsChatLoading(true);
-    const context = generateContext();
-    const prompt = `Context: ${context} User Question: "${chatQuery}" Answer strictly based on data. Format nicely with markdown tables/bolding if needed.`;
-    const response = await callGemini(prompt);
-    setChatResponse(response); setIsChatLoading(false);
-  };
-
-  // Date Label Logic for Button
   const dateLabel = useMemo(() => {
     if (datasets.length === 0) return "0 Datasets Loaded";
     const uniqueDates = new Set();
-    datasets.forEach(ds => {
-        if (ds.data && ds.data.length > 0 && ds.data[0].date) { uniqueDates.add(ds.data[0].date); }
-    });
+    datasets.forEach(ds => { if (ds.data && ds.data.length > 0 && ds.data[0].date) { uniqueDates.add(ds.data[0].date); } });
     const countText = `${datasets.length} Dataset${datasets.length !== 1 ? 's' : ''} Loaded`;
     const dates = Array.from(uniqueDates);
     if (dates.length === 1) {
@@ -974,6 +814,61 @@ const App = () => {
     if (dates.length > 1) return `Multiple Dates (${countText})`;
     return countText;
   }, [datasets]);
+
+  const generateContext = () => {
+    if (!processedData || !activeData.length) return "";
+    const contextPcr = metric === 'premium' ? (totalCallPremium > 0 ? (totalPutPremium / totalCallPremium).toFixed(2) : "N/A") : (totalCallSize > 0 ? (totalPutSize / totalCallSize).toFixed(2) : "N/A");
+    const topStrikes = [...chartData].slice(0, 5).map(s => `Strike $${s.strike}`).join('; ');
+    let netFlowTrend = "Flat", spotTrend = "Flat", divergence = "None";
+    if (momentumData.length > 1) {
+        const startFlow = momentumData[0].netCumulative;
+        const endFlow = momentumData[momentumData.length - 1].netCumulative;
+        const startSpot = momentumData[0].spot;
+        const endSpot = momentumData[momentumData.length - 1].spot;
+        if (endFlow > startFlow) netFlowTrend = "Accumulating (Bullish)"; else if (endFlow < startFlow) netFlowTrend = "Distributing (Bearish)";
+        if (endSpot > startSpot) spotTrend = "Increasing"; else if (endSpot < startSpot) spotTrend = "Decreasing";
+        if (spotTrend === "Decreasing" && netFlowTrend.includes("Bullish")) divergence = "Bullish Divergence (Price Down, Flow Up)";
+        if (spotTrend === "Increasing" && netFlowTrend.includes("Bearish")) divergence = "Bearish Divergence (Price Up, Flow Down)";
+    }
+    return `Mode: ${metric.toUpperCase()} (Filter: ${minValueFilter}) Ticker: ${activeData[0]?.symbol} | Spot: $${latestSpot.toFixed(2)} Calls: ${metric==='premium' ? '$'+(totalCallPremium/1e6).toFixed(2)+'M' : totalCallSize} Puts: ${metric==='premium' ? '$'+(totalPutPremium/1e6).toFixed(2)+'M' : totalPutSize} PCR: ${contextPcr} Top Strikes: ${topStrikes} --- TREND ANALYSIS --- Net Flow Trend: ${netFlowTrend} Spot Price Trend: ${spotTrend} Divergence Detected: ${divergence}`;
+  };
+
+  const handleGenerateSummary = async () => {
+      setIsPulseLoading(true); setAiSummary('');
+      const context = generateContext();
+      const prompt = `Expert summary for ${activeData[0]?.symbol} option flow. Mode: ${metric}. Filter: >${minValueFilter}. Context: ${context}. Provide 3 concise sentences on sentiment, levels, and whales. Use Markdown bold/lists/tables if needed.`;
+      const res = await callGemini(prompt);
+      setAiSummary(res); setIsPulseLoading(false);
+  };
+
+  const handleGenerateStrategies = async () => {
+      setIsStrategyLoading(true); setStrategies('');
+      const context = generateContext();
+      const prompt = `Based on the following Options Flow analysis, suggest 2 specific option trading strategies (e.g., Bull Put Spread, Iron Condor) with entry/exit rationale. Context: ${context}. Format as Markdown list.`;
+      const res = await callGemini(prompt);
+      setStrategies(res); setIsStrategyLoading(false);
+  };
+
+  // This now only called when user submits, not on type
+  const handleChatSubmit = async (query) => {
+    setIsChatLoading(true);
+    const context = generateContext();
+    const prompt = `Context: ${context} User Question: "${query}" Answer strictly based on data. Format nicely with markdown tables/bolding if needed.`;
+    const response = await callGemini(prompt);
+    setChatResponse(response); 
+    setIsChatLoading(false);
+  };
+
+  // Suggested Questions Logic
+  const suggestedQuestions = useMemo(() => {
+    if (!datasets.length) return [];
+    return [
+      `What is the sentiment for ${activeData[0]?.symbol || 'this ticker'}?`,
+      "Are there any divergences?",
+      "Show me the biggest whale trades",
+      "What strike has the most volume?"
+    ];
+  }, [datasets, activeData]);
 
   if (datasets.length === 0) {
       return (
@@ -993,7 +888,8 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8 font-sans text-gray-800" onClick={() => setShowDatasetManager(false)}>
-      {/* Header */}
+      <PerfMonitor isVisible={showPerfMonitor} />
+
       <div className="max-w-7xl mx-auto mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="relative">
             <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2"><Activity className="text-blue-600" /> Options Flow Analyzer</h1>
@@ -1011,6 +907,7 @@ const App = () => {
             )}
         </div>
         <div className="flex gap-2">
+            <button onClick={() => setShowPerfMonitor(!showPerfMonitor)} className={`p-2 rounded-lg transition-colors ${showPerfMonitor ? 'bg-green-100 text-green-600' : 'bg-white text-gray-400 border border-gray-200'}`} title="Toggle Performance Monitor"><Settings className="w-4 h-4" /></button>
             <button onClick={handleSaveProject} className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors shadow-sm" title="Save Project"><Save className="w-4 h-4" /> Save</button>
              <label className="cursor-pointer flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors shadow-sm"><Plus className="w-4 h-4" /> Import Data <input type="file" accept=".csv,.json" className="hidden" onChange={handleSmartImport} /></label>
         </div>
@@ -1124,6 +1021,7 @@ const App = () => {
                        dataKey="netCumulative" 
                        stroke="#3b82f6" 
                        strokeWidth={2} 
+                       // Updated to pass key explicitly if showMA is true, or render null to avoid object error
                        dot={({key, payload, cx, cy}) => showMA ? <SignalDot key={key} payload={payload} cx={cx} cy={cy} /> : null} 
                    />
                    {/* MA Line */}
@@ -1138,22 +1036,44 @@ const App = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-gradient-to-br from-indigo-50 to-purple-50 p-4 rounded-lg shadow-sm border border-indigo-100">
-            <div className="flex items-center gap-2 mb-3"><Sparkles className="w-5 h-5 text-indigo-600" /><h3 className="font-bold text-indigo-900">AI Insights</h3></div>
-            {!aiSummary && !isAiLoading && (<button onClick={handleGenerateSummary} className="w-full py-2 bg-white border border-indigo-200 text-indigo-600 rounded-md text-sm font-semibold hover:bg-indigo-50 transition-colors shadow-sm flex items-center justify-center gap-2">✨ Analyze Sentiment ({metricLabel})</button>)}
-            {isAiLoading && (<div className="flex items-center justify-center py-4 text-indigo-400"><Loader2 className="w-5 h-5 animate-spin" /><span className="ml-2 text-xs">Analyzing {metric} data...</span></div>)}
-            {aiSummary && (<FormattedMarkdown text={aiSummary} />)}
-            {aiSummary && (<button onClick={handleGenerateSummary} className="block mt-3 text-xs text-indigo-500 hover:underline font-medium">Refresh Analysis</button>)}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* 1. AI Insights (General) */}
+          <div className="bg-gradient-to-br from-indigo-50 to-purple-50 p-4 rounded-lg shadow-sm border border-indigo-100 flex flex-col h-[450px]"> 
+            <div className="flex items-center gap-2 mb-3 flex-shrink-0"><Sparkles className="w-5 h-5 text-indigo-600" /><h3 className="font-bold text-indigo-900">AI Market Pulse</h3></div>
+            <div className="flex-1 overflow-y-auto min-h-0 pr-1">
+                {!aiSummary && !isPulseLoading && (
+                    <div className="h-full flex items-center justify-center">
+                        <button onClick={handleGenerateSummary} className="px-4 py-2 bg-white border border-indigo-200 text-indigo-600 rounded-md text-sm font-semibold hover:bg-indigo-50 transition-colors shadow-sm flex items-center gap-2">✨ Analyze Sentiment</button>
+                    </div>
+                )}
+                {isPulseLoading && (<div className="h-full flex items-center justify-center text-indigo-400 flex-col gap-2"><Loader2 className="w-6 h-6 animate-spin" /><span className="text-xs">Analyzing {metric} data...</span></div>)}
+                {aiSummary && (<div className="text-xs text-indigo-800 leading-relaxed"><FormattedMarkdown text={aiSummary} /></div>)}
+            </div>
+            {aiSummary && (<div className="mt-3 pt-2 border-t border-indigo-100 flex-shrink-0"><button onClick={handleGenerateSummary} className="text-xs text-indigo-500 hover:underline font-medium w-full text-center">Refresh Analysis</button></div>)}
           </div>
-          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
-            <h3 className="text-sm font-medium text-gray-500 mb-3 flex items-center gap-2"><MessageSquare className="w-4 h-4" /> Ask the Data</h3>
-            <form onSubmit={handleChat} className="relative">
-              <input type="text" value={chatQuery} onChange={(e) => setChatQuery(e.target.value)} placeholder={`Ask about ${metricLabel.toLowerCase()}...`} className="w-full pl-3 pr-10 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
-              <button type="submit" disabled={isChatLoading || !chatQuery} className="absolute right-1 top-1 p-1.5 text-gray-400 hover:text-indigo-600 disabled:opacity-50">{isChatLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}</button>
-            </form>
-            {chatResponse && (<div className="mt-3 p-3 bg-gray-50 rounded-md border-l-2 border-indigo-400"><FormattedMarkdown text={chatResponse} /></div>)}
+
+          {/* 2. AI Strategy Lab */}
+          <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-4 rounded-lg shadow-sm border border-emerald-100 flex flex-col h-[450px]"> 
+            <div className="flex items-center gap-2 mb-3 flex-shrink-0"><Lightbulb className="w-5 h-5 text-emerald-600" /><h3 className="font-bold text-emerald-900">AI Strategy Lab</h3></div>
+            <div className="flex-1 overflow-y-auto min-h-0 pr-1">
+                {!strategies && !isStrategyLoading && (
+                    <div className="h-full flex items-center justify-center">
+                        <button onClick={handleGenerateStrategies} className="px-4 py-2 bg-white border border-emerald-200 text-emerald-600 rounded-md text-sm font-semibold hover:bg-emerald-50 transition-colors shadow-sm flex items-center gap-2">💡 Suggest Strategies</button>
+                    </div>
+                )}
+                {isStrategyLoading && (<div className="h-full flex items-center justify-center text-emerald-400 flex-col gap-2"><Loader2 className="w-6 h-6 animate-spin" /><span className="text-xs">Generating alpha...</span></div>)}
+                {strategies && (<div className="text-xs text-emerald-800 leading-relaxed"><FormattedMarkdown text={strategies} /></div>)}
+            </div>
+            {strategies && (<div className="mt-3 pt-2 border-t border-emerald-100 flex-shrink-0"><button onClick={handleGenerateStrategies} className="text-xs text-emerald-500 hover:underline font-medium w-full text-center">New Ideas</button></div>)}
           </div>
+
+          {/* 3. Ask the Data (Chat) - ISOLATED */}
+          <ChatInterface 
+              suggestedQuestions={suggestedQuestions}
+              onSend={handleChatSubmit}
+              chatResponse={chatResponse}
+              isChatLoading={isChatLoading}
+          />
         </div>
       </div>
     </div>
