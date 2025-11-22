@@ -4,9 +4,9 @@
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg) ![React](https://img.shields.io/badge/React-18-blue) ![Tailwind](https://img.shields.io/badge/Tailwind-4.0-38bdf8)
 
+## 🎥 Demo
 
 https://github.com/user-attachments/assets/fc80269a-9537-4fae-b64d-1be79d60c8ef
-
 
 ## 🚀 Features
 
@@ -26,16 +26,19 @@ https://github.com/user-attachments/assets/fc80269a-9537-4fae-b64d-1be79d60c8ef
 * **Intelligent Deduplication:** Automatically detects and removes duplicate trades if datasets overlap (e.g., File 1 ends at 2:00 PM, File 2 starts at 1:55 PM).
 * **Project Saving:** Save your entire workspace (all loaded datasets) as a single `.json` project file and reload it later to pick up exactly where you left off.
 * **Data Deletion:** Manage your workspace by removing specific datasets via the "Database" menu.
+* **Performance Monitor:** A built-in developer tool (toggleable via settings) to track FPS, Render Counts, and Memory usage in real-time.
 
 ### 3. Dynamic Analysis
 * **Metric Toggle:** Switch the entire dashboard view between **Premium ($)** (Dollar value / Conviction) and **Volume (#)** (Contract count / Liquidity).
+* **🔥 Aggressive Mode:** A specialized filter that isolates urgent, high-conviction trades (Side: Ask/Above + Moneyness: OTM/ATM), stripping away hedges to reveal pure directional bets.
 * **Filtering:** Filter data by:
     * **Expiration Date** (Dynamic list based on loaded data).
     * **Minimum Premium/Size** (e.g., Show only trades > $500k).
 * **Dashboard Stats:** Real-time summary cards for Total Call/Put Premium, Put/Call Ratio (PCR), and the Most Active Strike Level.
 
 ### 4. AI-Powered Insights 🤖
-* **Sentiment Analysis:** One-click generation of an executive summary using Google's Gemini LLM. The AI analyzes the *currently filtered* view to provide context-aware commentary on trends, divergences, and whale positioning.
+* **Sentiment Analysis:** One-click generation of an executive summary using Google's Gemini LLM. The AI analyzes the *currently filtered* view (including Aggressive Mode) to provide context-aware commentary on trends, divergences, and whale positioning.
+* **AI Strategy Lab:** Generates actionable trading strategies (e.g., "Bull Put Spread") based on the specific flow structure and risk factors detected in the data.
 * **"Ask the Data" Chat:** A natural language interface to query your specific dataset (e.g., "What is the biggest bearish trade today?").
 
 ---
@@ -95,5 +98,5 @@ This project is built with **Vite + React** and uses **Tailwind CSS** for stylin
 ## 💡 Usage Tips
 
 * **Identifying Reversals:** Look at the **Momentum Chart**. If the Asset Price (Purple Line) is making a "Lower Low" but the Net Flow (Blue Line) is making a "Higher Low," this is a classic **Bullish Divergence** signaling a potential bounce.
-* **Whale Watching:** Switch the filter to **Min: > $100k** or **> $500k**. The Tornado Chart will filter out retail noise, showing you exactly where the big institutional money is positioning.
+* **Whale Watching:** Switch the filter to **Min: > $100k** or **> $500k** and enable **Aggressive Mode**. The Tornado Chart will filter out retail noise and hedges, showing you exactly where the big institutional money is aggressively positioning.
 * **Automation:** While the app is manual import-based, you can use the provided Python script (see `scripts/` folder if applicable) to automate downloading exports from Cheddar Flow using Playwright + Gmail API.
