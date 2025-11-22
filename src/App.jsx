@@ -12,17 +12,17 @@ import {
   ResponsiveContainer, 
   ReferenceLine
 } from 'recharts';
-import { Upload, FileText, Filter, TrendingUp, TrendingDown, Activity, Info, Sparkles, MessageSquare, Send, Loader2, ArrowRightLeft, Plus, Database, Layers, DollarSign, HelpCircle, Trash2, X, MoveDiagonal, Settings, Save, FolderOpen, Download, Cpu, ShieldAlert, Lightbulb } from 'lucide-react';
+import { Upload, FileText, Filter, TrendingUp, TrendingDown, Activity, Info, Sparkles, MessageSquare, Send, Loader2, ArrowRightLeft, Plus, Database, Layers, DollarSign, HelpCircle, Trash2, X, MoveDiagonal, Settings, Save, FolderOpen, Download, Cpu, ShieldAlert, Lightbulb, Flame } from 'lucide-react';
 
 // --- Helper Functions ---
 
-// Gemini API Helper
 const callGemini = async (prompt) => {
   // ---------------------------------------------------------
   // 🔑 API KEY CONFIGURATION
   // For LOCAL use: Paste your key inside the quotes below.
   // ---------------------------------------------------------
   const apiKey = ""; 
+  
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
   
   const payload = { 
@@ -206,7 +206,6 @@ const PercentageRing = ({ percent, colorClass, trackColorClass = "text-gray-100"
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (percent / 100) * circumference;
   const safePercent = isNaN(percent) ? 0 : Math.min(100, Math.max(0, percent));
-
   return (
     <div className="relative w-16 h-16 flex items-center justify-center flex-shrink-0 ml-2">
       <svg className="w-full h-full transform -rotate-90">
@@ -247,14 +246,12 @@ const SignalDot = (props) => {
 const CustomTooltip = ({ active, payload, label, metric }) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload; 
-    
     // Handling different payload structures for different charts
     if (data.netCumulative !== undefined) {
         // MOMENTUM CHART TOOLTIP
         const maValue = data.ma;
         const isBullish = maValue !== null && data.netCumulative > maValue;
         const spotPrice = data.spot;
-        
         return (
             <div className="bg-white p-3 border border-gray-200 shadow-lg rounded-md z-50 text-sm min-w-[160px]">
               <p className="font-bold text-gray-800 mb-1 border-b pb-1 text-xs">{data.fullDate}</p>
@@ -265,14 +262,12 @@ const CustomTooltip = ({ active, payload, label, metric }) => {
                         ${spotPrice ? spotPrice.toFixed(2) : 'N/A'}
                     </span>
                  </div>
-
                  <div className="flex justify-between">
                     <span className="text-xs text-gray-500">Net Flow ({data.bucketSizeLabel}):</span>
                     <span className={`text-xs font-mono font-bold ${data.netCumulative >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                         {metric === 'premium' ? `$${(data.netCumulative/1000).toFixed(1)}k` : `${data.netCumulative.toLocaleString()} vol`}
                     </span>
                  </div>
-                 
                  {maValue !== null && (
                     <div className="flex justify-between">
                          <span className="text-xs text-gray-500">MA:</span>
@@ -281,7 +276,6 @@ const CustomTooltip = ({ active, payload, label, metric }) => {
                          </span>
                     </div>
                  )}
-
                  <div className="flex justify-between mt-1 pt-1 border-t border-gray-100">
                     <span className="text-xs text-gray-500">Trend:</span>
                     {maValue !== null ? (
@@ -294,16 +288,13 @@ const CustomTooltip = ({ active, payload, label, metric }) => {
             </div>
         );
     }
-
     // BAR CHART TOOLTIP
     const totalCallPrem = data.callPremiumNormal + data.callPremiumWhale;
     const totalPutPrem = Math.abs(data.putPremiumNormal + data.putPremiumWhale);
     const totalCallSize = data.callSizeNormal + data.callSizeWhale;
     const totalPutSize = Math.abs(data.putSizeNormal + data.putSizeWhale);
-    
     const whaleCallPrem = data.callPremiumWhale;
     const whalePutPrem = Math.abs(data.putPremiumWhale);
-
     return (
       <div className="bg-white p-4 border border-gray-200 shadow-lg rounded-md z-50 text-sm min-w-[220px]">
         <p className="font-bold text-gray-800 mb-2 border-b pb-1">Strike: ${label}</p>
@@ -327,7 +318,6 @@ const CustomTooltip = ({ active, payload, label, metric }) => {
 // --- Improved Markdown Formatter ---
 const FormattedMarkdown = ({ text }) => {
   if (!text) return null;
-  
   const renderInline = (content) => {
     const parts = content.split(/(\*\*.*?\*\*)/g);
     return parts.map((part, i) => {
@@ -335,17 +325,13 @@ const FormattedMarkdown = ({ text }) => {
       return part;
     });
   };
-
   const lines = text.split('\n');
   const blocks = [];
   let currentTable = [];
-
   lines.forEach((line) => {
-    // Fix for bullet + header (e.g. •### Title)
-    // We check if line is a "fake header" and clean it up
     let cleanLine = line.trim();
+    // Fix for bullet + header (e.g. •### Title)
     if (/^[\u2022\-\*]\s*#{2,}/.test(cleanLine)) {
-        // Remove the bullet so it parses as a header below
         cleanLine = cleanLine.replace(/^[\u2022\-\*]\s*/, ''); 
     }
 
@@ -377,16 +363,12 @@ const FormattedMarkdown = ({ text }) => {
         } else {
           const trimmed = block.content;
           if (!trimmed) return <div key={index} className="h-2" />;
+          // Adjusted regex to catch markdown headers even if spaced differently
+          if (trimmed.startsWith('###') || trimmed.startsWith('##')) return <h4 key={index} className="font-bold text-indigo-900 mt-3 mb-1 text-sm">{renderInline(trimmed.replace(/^#+\s*/, ''))}</h4>;
           
-          // Header parsing
-          if (trimmed.startsWith('###') || trimmed.startsWith('##')) {
-             return <h4 key={index} className="font-bold text-indigo-900 mt-3 mb-1 text-sm">{renderInline(trimmed.replace(/^#+\s*/, ''))}</h4>;
-          }
-          
-          // List Item parsing
+          // Clean bullets for display
           const isBullet = trimmed.startsWith('* ') || trimmed.startsWith('- ') || trimmed.startsWith('• ');
           const isNumber = /^\d+\.\s/.test(trimmed);
-          
           let content = trimmed;
           if (isBullet) content = trimmed.replace(/^[\*\-\u2022]\s*/, '');
           if (isNumber) content = trimmed.replace(/^\d+\.\s/, '');
@@ -414,50 +396,25 @@ const ChatInterface = ({ suggestedQuestions, onSend, chatResponse, isChatLoading
     e.preventDefault();
     if (!inputValue.trim()) return;
     onSend(inputValue);
-    setInputValue(''); // Clear input after sending
+    setInputValue(''); 
   };
 
   return (
     <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 flex flex-col h-[450px]">
       <h3 className="text-sm font-medium text-gray-500 mb-3 flex items-center gap-2 flex-shrink-0"><MessageSquare className="w-4 h-4" /> Ask the Data</h3>
-      
-      {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto min-h-0 pr-1 mb-3 flex flex-col">
-          {chatResponse && (
-              <div className="p-3 mb-4 bg-gray-50 rounded-md border-l-2 border-indigo-400 text-xs animate-in fade-in duration-300">
-                  <FormattedMarkdown text={chatResponse} />
-              </div>
-          )}
-          
-           {isChatLoading && (
-               <div className="p-3 mb-4 flex items-center gap-2 text-gray-400 text-xs">
-                  <Loader2 className="w-3 h-3 animate-spin" /> Thinking...
-               </div>
-          )}
-
+          {chatResponse && (<div className="p-3 mb-4 bg-gray-50 rounded-md border-l-2 border-indigo-400 text-xs animate-in fade-in duration-300"><FormattedMarkdown text={chatResponse} /></div>)}
+          {isChatLoading && (<div className="p-3 mb-4 flex items-center gap-2 text-gray-400 text-xs"><Loader2 className="w-3 h-3 animate-spin" /> Thinking...</div>)}
           <div className="mt-auto pt-2">
               <p className="text-[10px] text-gray-400 mb-2 uppercase font-bold tracking-wide">Suggested Queries:</p>
               <div className="flex flex-wrap gap-2">
-                  {suggestedQuestions.map((q, i) => (
-                  <button key={i} onClick={() => onSend(q)} className="text-[10px] px-2 py-1 bg-gray-50 border border-gray-200 rounded-full text-gray-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors text-left truncate max-w-full">
-                      {q}
-                  </button>
-                  ))}
+                  {suggestedQuestions.map((q, i) => (<button key={i} onClick={() => onSend(q)} className="text-[10px] px-2 py-1 bg-gray-50 border border-gray-200 rounded-full text-gray-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors text-left truncate max-w-full">{q}</button>))}
               </div>
           </div>
       </div>
-
       <form onSubmit={handleSubmit} className="relative flex-shrink-0 border-t border-gray-100 pt-3">
-        <input 
-          type="text" 
-          value={inputValue} 
-          onChange={(e) => setInputValue(e.target.value)} 
-          placeholder="Type a question..." 
-          className="w-full pl-3 pr-10 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" 
-        />
-        <button type="submit" disabled={isChatLoading || !inputValue} className="absolute right-1 top-4 p-1.5 text-gray-400 hover:text-indigo-600 disabled:opacity-50">
-            {isChatLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-        </button>
+        <input type="text" value={inputValue} onChange={(e) => setInputValue(e.target.value)} placeholder="Type a question..." className="w-full pl-3 pr-10 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+        <button type="submit" disabled={isChatLoading || !inputValue} className="absolute right-1 top-4 p-1.5 text-gray-400 hover:text-indigo-600 disabled:opacity-50">{isChatLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}</button>
       </form>
     </div>
   );
@@ -479,9 +436,12 @@ const App = () => {
   const [isStrategyLoading, setIsStrategyLoading] = useState(false);
   const [isChatLoading, setIsChatLoading] = useState(false);
   
+  // NEW: "Aggressive Only" Mode State
+  const [aggressiveOnly, setAggressiveOnly] = useState(false);
+  
   const [aiSummary, setAiSummary] = useState('');
   const [strategies, setStrategies] = useState('');
-  const [chatResponse, setChatResponse] = useState(''); // Only response state needed in App
+  const [chatResponse, setChatResponse] = useState('');
   const scrollContainerRef = useRef(null);
 
   // --- Constants ---
@@ -636,11 +596,33 @@ const App = () => {
     const defaultStructure = { chartData: [], momentumData: [], totalCallPremium: 0, totalPutPremium: 0, totalCallSize: 0, totalPutSize: 0, avgSpot: 0, latestSpot: 0 };
     if (!activeData.length) return defaultStructure;
 
+    // --- AGGRESSIVE FILTER LOGIC ---
     const filtered = activeData.filter(row => {
+      // 1. Standard Filters
       const matchesExpiry = selectedExpiry === 'All' || row.expiry === selectedExpiry;
       const valueToCheck = metric === 'premium' ? parsePremium(row.premium) : parseFloat(row.size || 0);
       const matchesFilter = valueToCheck >= minValueFilter;
-      return matchesExpiry && matchesFilter;
+      
+      // 2. Aggressive Only Logic (New)
+      let matchesAggressive = true;
+      if (aggressiveOnly) {
+          const side = row.side?.toLowerCase();
+          const spot = parseFloat(row.spot);
+          const strike = parseFloat(row.strike);
+          const type = row.put_call?.toLowerCase();
+
+          // Condition A: Must be Ask or Above Ask
+          const isUrgent = side === 'ask' || side === 'above_ask' || side === 'above';
+          
+          // Condition B: Must be OTM or ATM (Not Deep ITM)
+          let isSpeculative = false;
+          if (type === 'call') isSpeculative = strike >= spot * 0.995; // Strike is above or near spot
+          if (type === 'put') isSpeculative = strike <= spot * 1.005;  // Strike is below or near spot
+          
+          matchesAggressive = isUrgent && isSpeculative;
+      }
+
+      return matchesExpiry && matchesFilter && matchesAggressive;
     });
 
     const strikeMap = {};
@@ -711,7 +693,6 @@ const App = () => {
         const slice = arr.slice(index - maLength + 1, index + 1);
         const sum = slice.reduce((acc, curr) => acc + curr.netCumulative, 0);
         const ma = sum / maLength;
-
         let signal = null;
         if (index > 0) {
              const prevSlice = arr.slice(index - maLength, index); 
@@ -726,7 +707,7 @@ const App = () => {
     });
 
     return { chartData, momentumData, totalCallPremium, totalPutPremium, totalCallSize, totalPutSize, avgSpot: spotCount > 0 ? spotPrice / spotCount : 0, latestSpot };
-  }, [activeData, selectedExpiry, minValueFilter, metric, maLength]);
+  }, [activeData, selectedExpiry, minValueFilter, metric, maLength, aggressiveOnly]); // Added aggressiveOnly dependency
 
   const { chartData, momentumData, totalCallPremium, totalPutPremium, totalCallSize, totalPutSize, avgSpot, latestSpot } = processedData;
 
@@ -786,7 +767,6 @@ const App = () => {
   const axisTickStyle = { fill: '#9ca3af', fontSize: 10 };
   const sharedMargin = { top: 0, right: 45, left: 45, bottom: 0 };
   const yAxisWidth = 90;
-  // Nice Number Logic
   const maxAbsVal = chartData.length > 0 ? Math.max(
     ...chartData.map(d => Math.max(
        (metric === 'premium' ? d.callPremiumNormal + d.callPremiumWhale : d.callSizeNormal + d.callSizeWhale),
@@ -830,7 +810,7 @@ const App = () => {
         if (spotTrend === "Decreasing" && netFlowTrend.includes("Bullish")) divergence = "Bullish Divergence (Price Down, Flow Up)";
         if (spotTrend === "Increasing" && netFlowTrend.includes("Bearish")) divergence = "Bearish Divergence (Price Up, Flow Down)";
     }
-    return `Mode: ${metric.toUpperCase()} (Filter: ${minValueFilter}) Ticker: ${activeData[0]?.symbol} | Spot: $${latestSpot.toFixed(2)} Calls: ${metric==='premium' ? '$'+(totalCallPremium/1e6).toFixed(2)+'M' : totalCallSize} Puts: ${metric==='premium' ? '$'+(totalPutPremium/1e6).toFixed(2)+'M' : totalPutSize} PCR: ${contextPcr} Top Strikes: ${topStrikes} --- TREND ANALYSIS --- Net Flow Trend: ${netFlowTrend} Spot Price Trend: ${spotTrend} Divergence Detected: ${divergence}`;
+    return `Mode: ${metric.toUpperCase()} ${aggressiveOnly ? '(AGGRESSIVE ONLY)' : ''} (Filter: ${minValueFilter}) Ticker: ${activeData[0]?.symbol} | Spot: $${latestSpot.toFixed(2)} Calls: ${metric==='premium' ? '$'+(totalCallPremium/1e6).toFixed(2)+'M' : totalCallSize} Puts: ${metric==='premium' ? '$'+(totalPutPremium/1e6).toFixed(2)+'M' : totalPutSize} PCR: ${contextPcr} Top Strikes: ${topStrikes} --- TREND ANALYSIS --- Net Flow Trend: ${netFlowTrend} Spot Price Trend: ${spotTrend} Divergence Detected: ${divergence}`;
   };
 
   const handleGenerateSummary = async () => {
@@ -940,7 +920,14 @@ const App = () => {
                 <div className="flex bg-gray-100 rounded-md p-0.5 border border-gray-200 items-center">
                     <button onClick={() => handleMetricChange('premium')} className={`px-2 py-1 rounded text-xs font-medium transition-colors ${metric === 'premium' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`} title="View by Premium ($)"><DollarSign className="w-3.5 h-3.5" /></button>
                     <button onClick={() => handleMetricChange('size')} className={`px-2 py-1 rounded text-xs font-medium transition-colors ${metric === 'size' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`} title="View by Volume (Size)"><Layers className="w-3.5 h-3.5" /></button>
-                    <div className="relative group ml-1 mr-1"><HelpCircle className="w-3.5 h-3.5 text-gray-400 cursor-pointer hover:text-blue-500" /><div className="absolute right-0 top-full mt-2 w-64 bg-gray-800 text-white text-xs p-3 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50"><p className="mb-2"><strong>Premium ($):</strong> Shows high-conviction bets.</p><p><strong>Volume (#):</strong> Shows activity & liquidity.</p></div></div>
+                    {/* NEW: Aggressive Only Toggle */}
+                    <button 
+                        onClick={() => setAggressiveOnly(!aggressiveOnly)}
+                        className={`px-2 py-1 rounded text-xs font-medium transition-colors ml-1 flex items-center gap-1 ${aggressiveOnly ? 'bg-orange-50 text-orange-600 border border-orange-200' : 'text-gray-500 hover:text-gray-700'}`} 
+                        title="Aggressive Only: Show only OTM/ATM trades on Ask side"
+                    >
+                        <Flame className="w-3.5 h-3.5" /> {aggressiveOnly ? 'Aggro ON' : 'Aggro OFF'}
+                    </button>
                 </div>
                 <div className="flex items-center bg-gray-100 rounded-md px-2 py-1.5 border border-gray-200"><Filter className="w-3 h-3 text-gray-400 mr-2" /><select value={selectedExpiry} onChange={(e) => setSelectedExpiry(e.target.value)} className="bg-transparent text-xs font-medium text-gray-700 focus:outline-none cursor-pointer min-w-[80px]">{expiries.map(exp => (<option key={exp} value={exp}>{exp}</option>))}</select></div>
             </div>
@@ -1010,10 +997,8 @@ const App = () => {
                    <YAxis yAxisId="left" stroke="#3b82f6" fontSize={10} tickLine={false} tickFormatter={(val) => metric==='premium' ? `$${(val/1000).toFixed(0)}k` : val} />
                    {/* Right Axis: Spot Price */}
                    <YAxis yAxisId="right" orientation="right" domain={['auto', 'auto']} stroke="#f1c232" fontSize={10} tickLine={false} tickFormatter={(val) => `$${val.toFixed(2)}`} />
-                   
                    <Tooltip content={<CustomTooltip metric={metric} />} />
                    <ReferenceLine y={0} yAxisId="left" stroke="#000" strokeOpacity={0.1} />
-                   
                    {/* Net Flow Line */}
                    <Line 
                        yAxisId="left"
