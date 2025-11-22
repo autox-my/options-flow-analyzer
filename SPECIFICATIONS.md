@@ -59,13 +59,15 @@
 * **Filtering:**
     * **Expiry:** Dropdown to filter by specific expiration dates.
     * **Min Value:** Dropdown to filter out small trades (e.g., show only > $10k, > $100k, > $500k). The dropdown values adapt based on the Metric (Premium vs Volume).
+* **🔥 Aggressive Mode:** A specialized filter that isolates urgent, high-conviction trades (Side: Ask/Above + Moneyness: OTM/ATM), stripping away hedges to reveal pure directional bets.
 
 ## 5. AI Integration (Gemini API)
-* **Provider:** Google Gemini 2.5 Pro (via API Key).
+* **Provider:** Google Gemini 2.5 Flash (via API Key).
 * **Context Awareness:**
     * The prompt sent to the AI must reflect the **currently filtered view** (not just the raw file).
     * It must calculate and send: Net Flow Trend (Bullish/Bearish), Spot Price Trend, and any detected Divergences.
 * **Features:**
     * **"Analyze Sentiment":** Generates a 3-sentence executive summary.
+    * **AI Strategy Lab:** Generates actionable trading strategies based on the specific flow structure.
     * **"Ask the Data":** Chat interface for Q&A.
 * **Formatting:** The output supports Markdown rendering (bolding, lists, tables).
